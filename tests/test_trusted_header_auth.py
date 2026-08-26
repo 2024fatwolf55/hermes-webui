@@ -212,6 +212,34 @@ def test_group_map_prefers_mapping_order_over_header_order(monkeypatch):
     assert auth.ensure_trusted_auth_session(second)["bound_profile"] == "ops"
 
 
+def test_group_map_accepts_pipe_separated_header_value(monkeypatch):
+    # Some Authentik proxy provider / property mapping configs join multiple
+    # group names with "|" instead of ",". Regression case for the identity
+    # falling back to the unbound "default" profile despite being a member
+    # of a mapped group: a lone-membership identity works fine (no
+    # separator to parse), but a second group membership starts producing a
+    # pipe-joined header value that a comma-only split can't see through.
+    #
+    # NOTE: this only covers the concrete-mapped-group case. The
+    # wildcard-mapped-group case (a "*" mapping value dominating a concrete
+    # one) is intentionally not exercised here — that precedence rule isn't
+    # implemented on this branch yet; it ships separately in #6798. See the
+    # PR description for the full scope note.
+    _trusted_env(
+        monkeypatch,
+        groups_header="Remote-Groups",
+        group_map={"hermes_devops": "devops"},
+    )
+    handler = _Handler(
+        headers={"Remote-User": "alice", "Remote-Groups": "hermes_devops|other_group"}
+    )
+
+    info = auth.ensure_trusted_auth_session(handler)
+
+    assert info["bound_profile"] == "devops"
+    assert auth.trusted_session_allows_active_profile(info) is True
+
+
 @pytest.mark.parametrize(
     "group_map",
     [
