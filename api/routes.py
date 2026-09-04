@@ -1007,13 +1007,28 @@ def _find_skill_in_dir(name: str, skills_dir: Path) -> tuple[Path | None, Path |
     return _find_skill_in_dirs(name, [skills_dir])
 
 
+# Cap on the courtesy list of names carried by a skill-not-found reply. The
+# bound stays; what it must never do is present a partial list as the whole
+# set, because a caller that cannot find its skill in `available_skills` will
+# conclude the skill is not installed.
+_SKILL_NOT_FOUND_LIST_LIMIT = 20
+
+
 def _skill_not_found_payload(name: str, skills_dir: Path) -> dict:
-    available = [s["name"] for s in _skills_list_from_dir(skills_dir).get("skills", [])[:20]]
+    all_names = [s["name"] for s in _skills_list_from_dir(skills_dir).get("skills", [])]
+    total = len(all_names)
+    available = all_names[:_SKILL_NOT_FOUND_LIST_LIMIT]
+    truncated = total > len(available)
+    hint = "Use skills_list to see all available skills"
+    if truncated:
+        hint = f"Showing {len(available)} of {total} skills. {hint}"
     return {
         "success": False,
         "error": f"Skill '{name}' not found.",
         "available_skills": available,
-        "hint": "Use skills_list to see all available skills",
+        "available_skills_truncated": truncated,
+        "total_skills": total,
+        "hint": hint,
     }
 
 
