@@ -212,6 +212,37 @@ def test_group_map_prefers_mapping_order_over_header_order(monkeypatch):
     assert auth.ensure_trusted_auth_session(second)["bound_profile"] == "ops"
 
 
+@pytest.mark.parametrize(
+    "raw_header, expected",
+    [
+        # Single group, no separator to parse.
+        ("admins", ["admins"]),
+        # Comma-separated (the format this parser originally supported).
+        ("admins,developpeur", ["admins", "developpeur"]),
+        # Pipe-separated (this deployment's Authentik outpost format).
+        ("admins|developpeur", ["admins", "developpeur"]),
+        # Newline-separated (already supported before this fix).
+        ("admins\ndeveloppeur", ["admins", "developpeur"]),
+        # Mixed separators in the same value.
+        ("admins,developpeur|it\nops", ["admins", "developpeur", "it", "ops"]),
+        # Repeated/adjacent separators collapse instead of producing
+        # empty group names.
+        ("admins||developpeur", ["admins", "developpeur"]),
+        ("admins,,developpeur", ["admins", "developpeur"]),
+        # Surrounding and interior whitespace is trimmed per group.
+        (" admins | developpeur ", ["admins", "developpeur"]),
+        ("admins, developpeur", ["admins", "developpeur"]),
+    ],
+)
+def test_trusted_groups_header_value_accepts_separator_variants(
+    monkeypatch, raw_header, expected
+):
+    _trusted_env(monkeypatch, groups_header="Remote-Groups")
+    handler = _Handler(headers={"Remote-User": "alice", "Remote-Groups": raw_header})
+
+    assert auth._trusted_groups_header_value(handler) == expected
+
+
 def test_group_map_accepts_pipe_separated_header_value(monkeypatch):
     # Some Authentik proxy provider / property mapping configs join multiple
     # group names with "|" instead of ",". Regression case for the identity
