@@ -4249,7 +4249,14 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
         || (text.includes('compressed')&&!text.includes('compressing'))
       ) return 'compressed';
       if(
-        phase==='running'||phase==='compressing'
+        // NOT a bare phase==='running'. routes.py appends a placeholder
+        // "live anchor shell" row (role lifecycle, status running,
+        // source_event_type runtime_journal_snapshot) whenever a stream has
+        // events but no visible rows yet. That falls through the source check
+        // above, and a bare running phase then classified every such shell as
+        // a compression start - a permanent phantom "Compressing context"
+        // divider on sessions that never compressed anything.
+        phase==='compressing'
         || text.includes('compressing context')
         || text.includes('compacting context')
         || text.includes('preflight compression')
