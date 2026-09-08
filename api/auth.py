@@ -722,7 +722,16 @@ def _trusted_groups_header_value(handler) -> list[str]:
     if not raw:
         return []
     values = []
-    for part in str(raw).replace('\n', ',').split(','):
+    # Authentik's outpost typically joins multiple group names with a comma,
+    # but this deployment's proxy provider/property mapping emits a
+    # pipe-separated list instead (e.g. "admins|developpeur"). A bare comma
+    # split silently treats a multi-group pipe-joined value as one unmatched
+    # group name, dropping the session to the unbound "default" profile even
+    # though the identity is a legitimate member of a mapped group. Accept
+    # comma, pipe, and newline as equivalent separators so either format
+    # works regardless of which the outpost happens to send.
+    normalized = str(raw).replace('\n', ',').replace('|', ',')
+    for part in normalized.split(','):
         part = part.strip()
         if part:
             values.append(part)
