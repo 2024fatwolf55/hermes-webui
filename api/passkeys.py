@@ -208,7 +208,11 @@ def rp_context(handler) -> tuple[str, str]:
             from urllib.parse import urlparse
             parsed = urlparse(browser_origin.strip())
             if parsed.scheme in ("http", "https") and parsed.hostname:
-                netloc = parsed.hostname if parsed.port is None else f"{parsed.hostname}:{parsed.port}"
+                # Re-bracket IPv6 literals: parsed.hostname strips the [] that the
+                # browser's clientDataJSON.origin carries, so an unbracketed
+                # "http://::1:8787" would never match the stored origin.
+                host_part = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
+                netloc = host_part if parsed.port is None else f"{host_part}:{parsed.port}"
                 return parsed.hostname, f"{parsed.scheme}://{netloc}"
         except Exception:
             pass
