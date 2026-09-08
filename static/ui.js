@@ -1628,6 +1628,14 @@ async function jumpToSessionStart(){
     // insertion is blocked by !S.busy, losing Activity until "done" fires.
     if(!(S.busy||S.activeStreamId)){
       renderMessages({ preserveScroll:true });
+    }else if(typeof _scheduleMessageVirtualizedRender==='function'){
+      // ...but on a virtualized transcript SOMETHING still has to mount the new
+      // render window. The scroll listener used to do it; it now correctly skips
+      // while a programmatic scroll is in flight (the idle re-render-loop fix),
+      // and this path deliberately does not call renderMessages() — so without an
+      // explicit schedule the jump lands on an all-spacer, zero-row transcript.
+      // Force the window update here, after invalidating _messageVirtualWindowKey.
+      _scheduleMessageVirtualizedRender(true);
     }
     requestAnimationFrame(()=>{
       container.scrollTop=0;
