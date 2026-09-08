@@ -4592,7 +4592,7 @@ function renderModelDropdown(){
       const name=m.name.toLowerCase();
       const id=m.id.toLowerCase();
       if(name.includes(term)||id.includes(term)
-         ||_foldModelSearch(name).includes(foldTerm)||_foldModelSearch(id).includes(foldTerm)){
+         ||(foldTerm&&(_foldModelSearch(name).includes(foldTerm)||_foldModelSearch(id).includes(foldTerm)))){
         found.add(m.value);
       }
     }
