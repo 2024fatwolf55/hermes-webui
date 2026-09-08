@@ -187,13 +187,29 @@ def rp_context(handler) -> tuple[str, str]:
     # useless for deriving the RPID, while Origin still carries the origin the
     # browser is actually on. Prefer Origin's hostname: WebAuthn's RPID-origin
     # check compares against the page's origin, not the backend's.
+    #
+    # Origin is client-supplied, so this is deliberately NOT a trust decision:
+    # it only selects which name the ceremony is scoped to. The actual security
+    # gates are unchanged and live elsewhere — the authenticator will only
+    # release a credential whose RPID is a registrable suffix of the real page
+    # origin, `_client_data()` requires clientDataJSON.origin to equal the
+    # origin stored with the challenge, `_parse_auth_data()` compares the
+    # authenticator's rpIdHash against that same stored RPID, and the assertion
+    # signature is verified against the stored credential public key. A forged
+    # Origin therefore yields a self-consistent ceremony that still cannot
+    # produce a valid signature.
+    #
+    # Accept it only as a syntactically valid http(s) origin with a hostname,
+    # and rebuild the origin string from the parsed parts rather than echoing
+    # the raw header, so a malformed or non-http Origin falls through to Host.
     browser_origin = handler.headers.get("Origin", "")
     if browser_origin:
         try:
             from urllib.parse import urlparse
-            parsed = urlparse(browser_origin)
-            if parsed.hostname:
-                return parsed.hostname, browser_origin
+            parsed = urlparse(browser_origin.strip())
+            if parsed.scheme in ("http", "https") and parsed.hostname:
+                netloc = parsed.hostname if parsed.port is None else f"{parsed.hostname}:{parsed.port}"
+                return parsed.hostname, f"{parsed.scheme}://{netloc}"
         except Exception:
             pass
     # Fallback: derive from Host header (direct/internal access)
